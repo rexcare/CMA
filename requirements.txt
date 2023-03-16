@@ -1,0 +1,5 @@
+threading
+requests
+Queue
+subprocess
+sseclient
