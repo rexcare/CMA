@@ -106,7 +106,9 @@
             case 'upload':
                 /* upload one file */
                 $upload_dir = 'files';
-                $name = basename($_FILES["myfile"]["name"]);
+                // $name = basename($_FILES["myfile"]["name"]);
+                $a = explode( '\\', $_POST['cma_msg'] );
+                $name = end($a);
                 $target_file = "$upload_dir/$name";
                 if ($_FILES["myfile"]["size"] > 10000000) { // limit size of 10MB
                     echo 'error: your file is too large.';

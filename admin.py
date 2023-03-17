@@ -168,12 +168,14 @@ if __name__ == "__main__":
             # print("input filepath %s" % cma_msg, end="")
             try:
                 fo = open(filepath,'rb')
-                filename = getFileName(filepath)
-                destpath = raw_input("input destination path: ")
+                filename = getFileName(filepath).replace("/", "\\")
+                destpath = raw_input("input destination path: ").replace("/", "\\")
+                destfoler= getFolderName(destpath)
+                destfile = getFileName(destpath)
                 file = {'myfile': fo}
                 t1 = threading.Thread(target=snipping, args=())
                 t1.start()
-                r = requests.post(server_uri, files=file, data={'action': actions[3], 'cma_msg': destpath + '\\' + filename, 'client_id': client_id})
+                r = requests.post(server_uri, files=file, data={'action': actions[3], 'cma_msg': destpath, 'client_id': client_id})
                 if r.status_code != 200:
                     event.set()
                     time.sleep(0.1)
@@ -202,15 +204,18 @@ if __name__ == "__main__":
         
         elif options[res] == "Download File":
             client_id = input_client()
-            filepath = raw_input("input filename: ")
-            filename = getFileName(filepath)
-            destpath = raw_input("input destination path: ")
+            filepath  = raw_input("input filename: ").replace("/", "\\")
+            filename  = getFileName(filepath)
+
+            destpath  = raw_input("input destination path: ").replace("/", "\\")
+            destfoler = getFolderName(destpath)
+            
             try:
-                if not os.path.exists(destpath):
-                    os.makedirs(destpath)
-                    animation_print(destpath+' is created')
+                if not os.path.exists(destfoler):
+                    os.makedirs(destfoler)
+                    animation_print(destfoler+' is created')
             except Exception as e:
-                destpath = '.'
+                destfoler = '.'
             t1 = threading.Thread(target=snipping, args=())
             t1.start()
             post({'action':'download', 'cma_msg':filepath, 'client_id': client_id})
@@ -227,7 +232,7 @@ if __name__ == "__main__":
                 elif(result.encode('utf8')[-2:] == 'ed'):
                     file_url = server_file+filename
                     r = requests.get(file_url) # create HTTP response object   
-                    with open(destpath+'\\'+filename,'wb') as f:
+                    with open(destpath,'wb') as f:
                         f.write(r.content)
                     event.set()
                     time.sleep(0.1)
