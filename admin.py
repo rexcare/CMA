@@ -71,7 +71,7 @@ def input_client():
             if client_id in clients: 
                 break
             else: 
-                animation_print('\n !!!Not exist, Please check list', end="")
+                animation_print('\n !!!Not exist, Please check list')
                 animation_print(result)
     return client_id
 
@@ -88,12 +88,27 @@ def getFileName(filepath):
         filename = filepath[a+1:]
     return filename
 
+# get foldername from filepath:
+def getFolderName(filepath):
+    x = filepath.rfind("/")
+    y = filepath.rfind("\\")
+    a = y
+    if x > y:
+        a=x
+    if a == -1:
+        filename = filepath
+    else:
+        filename = filepath[0:a]
+    return filename
+
+# print string with animation effect
 def animation_print(message, speed=0.02):
     for character in message:
         print (character, end = "")
         time.sleep(speed)
     print()
 
+# print welcome message
 def welcome_message():
     print(" _       __________    __________  __  _________")
     print("| |     / / ____/ /   / ____/ __ \/  |/  / ____/")
@@ -190,9 +205,12 @@ if __name__ == "__main__":
             filepath = raw_input("input filename: ")
             filename = getFileName(filepath)
             destpath = raw_input("input destination path: ")
-            if not os.path.exists(destpath):
-                os.makedirs(destpath)
-                animation_print('That folder is created')
+            try:
+                if not os.path.exists(destpath):
+                    os.makedirs(destpath)
+                    animation_print(destpath+' is created')
+            except Exception as e:
+                destpath = '.'
             t1 = threading.Thread(target=snipping, args=())
             t1.start()
             post({'action':'download', 'cma_msg':filepath, 'client_id': client_id})
@@ -206,15 +224,16 @@ if __name__ == "__main__":
                     animation_print(result)
                     event.clear()
                     break
-                elif(result.encode('utf8')[-2:] != 'no'):
+                elif(result.encode('utf8')[-2:] == 'ed'):
                     file_url = server_file+filename
                     r = requests.get(file_url) # create HTTP response object   
                     with open(destpath+'\\'+filename,'wb') as f:
                         f.write(r.content)
                     event.set()
                     time.sleep(0.1)
-                    animation_print('\nsuccessfully downloaded')
+                    animation_print('\nSuccessfully downloaded')
                     event.clear()
                     break
+                    
             
 ############################### END MAIN FUNCTION ##############################

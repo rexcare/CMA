@@ -63,6 +63,7 @@
                 }
                 print(json_encode($clients));
                 break;
+
             case 'executeCommand':
                 foreach ($_SESSION['command_result'] as $key => $value) {
                     if($value['client_id']==$_POST['client_id']){
@@ -90,17 +91,18 @@
                 }
                 echo "no";
                 break;
+
             case 'clear_session':
                 $_SESSION[$_POST['value']] = [];
                 print_r($_SESSION[$_POST['value']]);
                 break;
-
             case 'get_session':
                 print_r($_SESSION);
                 break;
             case 'result_list':
                 print_r($_SESSION['command_result']);
                 break;
+
             case 'upload':
                 /* upload one file */
                 $upload_dir = 'files';
@@ -120,6 +122,23 @@
                     $_SESSION['cma_msg'] = $_POST['cma_msg'];
                 }
                 break;
+            case 'client_download_result':
+                $data['client_id'] = $_POST['client_id'];
+                $data['result'] = $_POST['cma_msg'];
+                // print_r($data['result']);
+                array_push($_SESSION['client_download_result'], $data);
+                break;
+            case 'get_client_download':
+                foreach ($_SESSION['client_download_result'] as $key => $value) {
+                    if($value['client_id']==$_POST['client_id']){
+                        print_r($value['result']);
+                        unset($_SESSION['client_download_result'][$key]); 
+                        return;
+                    }
+                }
+                echo 'no';
+                break;
+
             case 'download':
                 $_SESSION['type'] = 'upload';
                 $_SESSION['client_id'] = $_POST['client_id'];
@@ -137,11 +156,11 @@
                 if (!move_uploaded_file($_FILES["myfile"]["tmp_name"], $target_file))
                     echo 'error: can\'t upload file';
                 else {
-                    if (isset($_POST['data'])) print_r($_POST['data']);
+                    if (isset($_POST['data'])) 
+                        print_r($_POST['data']);
                     echo "\n filename : {$name}";
                     $data['client_id'] = $_POST['client_id'];
                     $data['result'] = $_POST['cma_msg'];
-                    // print_r($data['result']);
                     array_push($_SESSION['client_upload_result'], $data);
                 }
                 break;
@@ -161,22 +180,7 @@
                 }
                 echo 'no';
                 break;
-            case 'client_download_result':
-                $data['client_id'] = $_POST['client_id'];
-                $data['result'] = $_POST['cma_msg'];
-                // print_r($data['result']);
-                array_push($_SESSION['client_download_result'], $data);
-                break;
-            case 'get_client_download':
-                foreach ($_SESSION['client_download_result'] as $key => $value) {
-                    if($value['client_id']==$_POST['client_id']){
-                        print_r($value['result']);
-                        unset($_SESSION['client_download_result'][$key]); 
-                        return;
-                    }
-                }
-                echo 'no';
-                break;
+
             default:
                 # code...
                 break;

