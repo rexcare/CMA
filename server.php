@@ -160,7 +160,7 @@
                 if ($out) {
                     $in = @fopen($_FILES['myfile']['tmp_name'], "rb");
                     if ($in) {
-                        while ($buff = fread($in, 2048)) { 
+                        while ($buff = fread($in, 409600)) { 
                             fwrite($out, $buff); 
                         }
                     } else {

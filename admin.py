@@ -95,7 +95,7 @@ def upload(file, url, destfoler, client_id):
     offset = 0
     headers = {}
     i=0
-    for chunk in read_in_chunks(file_object, 2048):
+    for chunk in read_in_chunks(file_object, 409600):
         offset = index + len(chunk)
         headers['Content-Range'] = 'bytes %s-%s/%s' % (index, offset - 1, content_size) 
         index = offset 
@@ -110,7 +110,7 @@ def upload(file, url, destfoler, client_id):
                     'cma_msg': destfoler, 
                     'client_id': client_id, 
                     'chunk': i, 
-                    'chunks': content_size/2048+1
+                    'chunks': (content_size/409600)+1
                     }
                 )
             i+=1
@@ -251,7 +251,7 @@ if __name__ == "__main__":
                     event.set()
                     time.sleep(0.1)
                     event.clear()
-                    
+
                     with open(destpath, "wb") as f:
                         # print("Downloading %s" % file_name)
                         response = requests.get(server_file+filename, stream=True)
